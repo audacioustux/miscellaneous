@@ -9,7 +9,7 @@
 !theme plain
 top to bottom direction
 
-skinparam defaultFontName DM Sans
+skinparam defaultFontName MonaspaceNeon Nerd Font Propo
 skinparam defaultFontSize 13
 skinparam titleFontSize 18
 skinparam titleFontStyle bold
@@ -108,7 +108,7 @@ rectangle "**IaC Layers** — //OpenTofu · Sequential Dependencies//" $C_IAC {
       **Subnets**: Public (IGW) · Private (NAT) · Isolated (No Internet)
       **Gateways**: NAT (IPAM EIP) · IGW · Egress-Only IGW (IPv6)
       **Sharing**: RAM (Cross-Account Subnets) · VPC Endpoints (S3)
-      **Logging**: VPC Flow Logs → S3 (Parquet, REJECT)
+      **Logging**: VPC Flow Logs -> S3 (Parquet, REJECT)
     end note
   }
 
@@ -118,7 +118,7 @@ rectangle "**IaC Layers** — //OpenTofu · Sequential Dependencies//" $C_IAC {
       **Aurora** Serverless v2 (PostgreSQL · MySQL · Isolated Subnets)
       **ECR** Store (KMS · Scan-on-Push · Lifecycle · Immutable Tags)
       **Backup** Foundation (Tag-Based · Hourly/Daily/Weekly/Monthly)
-      **GitHub Actions** OIDC → ECR (Keyless CI/CD)
+      **GitHub Actions** OIDC -> ECR (Keyless CI/CD)
     end note
   }
 
@@ -151,11 +151,11 @@ rectangle "**Kubernetes Platform** — //ArgoCD-Managed via GitOps//" $C_K8S {
 
   rectangle "**Policy & Governance**\nKyverno (Admission Control)\nNetwork Policies (Cilium)" as KP $C_SEC
 
-  rectangle "**Secrets**\nExternal Secrets Operator\n→ AWS Secrets Manager" as KS $C_DATA
+  rectangle "**Secrets**\nExternal Secrets Operator\n-> AWS Secrets Manager" as KS $C_DATA
 
   rectangle "**Autoscaling & Scheduling**\nVPA (Vertical Pod Autoscaler)\nDescheduler (Pod Rebalancing)" as KA $C_COMPUTE
 
-  rectangle "**Automation**\nArgoCD (CD Engine)\nImage Updater (ECR → Git)" as KAU $C_CD
+  rectangle "**Automation**\nArgoCD (CD Engine)\nImage Updater (ECR -> Git)" as KAU $C_CD
 }
 
 L4 -d[#999]-> KN : deploys
@@ -168,7 +168,7 @@ rectangle "**GitOps Delivery Model** — //Convention-Based, Declarative//" $C_C
 
   rectangle "**ArgoCD Bootstrap**\nApplicationSets (Auto-Discovery)\nAppProjects (RBAC Boundaries)" as BOOT
 
-  rectangle "**Three-Layer Sync Model**\n① Namespaces (Quotas · Limits) → Wave -20\n② Platform (Infra Services) → Wave -15..0\n③ Applications (Workloads) → Wave 0+" as SYNC
+  rectangle "**Three-Layer Sync Model**\n1) Namespaces (Quotas · Limits) -> Wave -20\n2) Platform (Infra Services) -> Wave -15..0\n3) Applications (Workloads) -> Wave 0+" as SYNC
 
   rectangle "**Repository Convention**\napps/<project>/<app>/base/ + overlays/<env>/\nclusters/<cluster>/namespaces · platform · apps\nbootstrap/<cluster>/argocd (appsets · projects)" as CONV
 
@@ -184,12 +184,12 @@ CD_SUB -d[#999]-> BOOT : manifests
 rectangle "**CI/CD Pipeline** — //End-to-End Delivery Flow//" $C_CICD {
 
   note as cicdN
-    **Developer** → push code → **App Repo**
-    → trigger → **GitHub Actions** (CI)
-    → OIDC token → **AWS OIDC Provider** → temp credentials
-    → build & push → **ECR** (Container Registry)
-    → webhook/poll → **ArgoCD Image Updater** → update tag → **GitOps Repo**
-    → webhook/poll → **ArgoCD** (Sync) → apply manifests → **Kubernetes Cluster**
+    **Developer** -> push code -> **App Repo**
+    -> trigger -> **GitHub Actions** (CI)
+    -> OIDC token -> **AWS OIDC Provider** -> temp credentials
+    -> build & push -> **ECR** (Container Registry)
+    -> webhook/poll -> **ArgoCD Image Updater** -> update tag -> **GitOps Repo**
+    -> webhook/poll -> **ArgoCD** (Sync) -> apply manifests -> **Kubernetes Cluster**
   end note
 }
 
@@ -201,7 +201,7 @@ rectangle "**Data & Security** — //Cross-Cutting Concerns//" $C_DATA {
 
   rectangle "**Data Layer**\nAurora Serverless v2 (PostgreSQL · MySQL)\nECR Repositories (KMS · Immutable Tags · Lifecycle)\nS3 Buckets (data · logs · archive · tfbackend)" as DL $C_DATA
 
-  rectangle "**Protection & Compliance**\nKMS (Customer-Managed · Annual Rotation)\nAWS Backup (Tag-Based Multi-Tier Plans)\nPod Identity · OIDC Federation\nSecrets Manager (Managed Rotation)\nNetwork Policies · Kyverno Policies\nVPC Flow Logs (Parquet → S3)" as PR $C_SEC
+  rectangle "**Protection & Compliance**\nKMS (Customer-Managed · Annual Rotation)\nAWS Backup (Tag-Based Multi-Tier Plans)\nPod Identity · OIDC Federation\nSecrets Manager (Managed Rotation)\nNetwork Policies · Kyverno Policies\nVPC Flow Logs (Parquet -> S3)" as PR $C_SEC
 
   rectangle "**State Management**\nS3 Backend (Object Lock · Versioning)\nCross-Account Role Assumption\nDynamoDB Lock Table" as ST $C_IAC
 }
@@ -214,7 +214,7 @@ legend right
   **Design Philosophies**
   ---------------------------------------
   • **Modularity** — Three-tier
-    (Stack → Resource → Utility)
+    (Stack -> Resource -> Utility)
   • **Security First** — KMS,
     least-privilege IAM, Pod Identity
   • **Cost Optimization** — Serverless,
@@ -243,7 +243,7 @@ legend right
   Secrets   : ESO · Secrets Manager
   Scaling   : VPA · Descheduler
   Backup    : AWS Backup (tag-based)
-  CI        : GitHub Actions (OIDC→ECR)
+  CI        : GitHub Actions (OIDC->ECR)
 endlegend
 
 @enduml

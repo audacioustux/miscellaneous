@@ -1,0 +1,249 @@
+@startuml sdp-architecture
+
+' =============================================================================
+' Software Delivery Platform (SDP) — Complete Reference Architecture
+' =============================================================================
+' Client-agnostic, environment-agnostic blueprint.
+' =============================================================================
+
+!theme plain
+top to bottom direction
+
+skinparam defaultFontName DM Sans
+skinparam defaultFontSize 13
+skinparam titleFontSize 18
+skinparam titleFontStyle bold
+skinparam shadowing false
+skinparam wrapWidth 250
+skinparam nodesep 12
+skinparam ranksep 20
+skinparam padding 6
+
+skinparam rectangle {
+  RoundCorner 8
+}
+
+' --- Color Palette ---
+!$C_REPO    = "#E3F2FD"
+!$C_MODULE  = "#F3E5F5"
+!$C_IAC     = "#FFF8E1"
+!$C_K8S     = "#E8F5E9"
+!$C_CD      = "#E8EAF6"
+!$C_DATA    = "#FCE4EC"
+!$C_SEC     = "#FFF9C4"
+!$C_CICD    = "#F5F5F5"
+!$C_COMPUTE = "#FFE0B2"
+!$C_GREEN   = "#C8E6C9"
+!$C_ACCENT  = "#BBDEFB"
+
+title Software Delivery Platform (SDP)\nReference Architecture
+
+' ═══════════════════════════════════════════════════════
+' ROW 1: PLATFORM REPOSITORY & MODULE ARCHITECTURE
+' ═══════════════════════════════════════════════════════
+
+rectangle "**Platform Repository**\n//SDP Core — Modules · Conventions · Documentation//" $C_REPO {
+
+  rectangle "**Stack Modules** — Opinionated Business Solutions" as SM $C_MODULE {
+    note as smN
+      **ipam-foundation** · **backup-foundation** · **ecr-store**
+      **s3-tfbackend** · **secrets-store** · **vpc-flowlogs** · **github-actions-ecr**
+      ---
+      //Compose resource modules into reusable patterns//
+    end note
+  }
+
+  rectangle "**Resource Modules** — Atomic Cloud Building Blocks" as RM $C_MODULE {
+    note as rmN
+      **EKS**: eks-core · eks-karpenter · eks-node-groups · eks-addons · eks-pod-identity
+      **Data**: aurora-postgresql · aurora-mysql · ecr-repository · s3-data · s3-logs · s3-archive
+      **Network**: vpc-core · vpc-subnet · vpc-nat-gateway · vpc-igw · vpc-eigw · vpc-endpoints
+      **Foundation**: ipam-pool · ram-share · iam-role · route53-public-zone · backup-vault · backup-plan
+      ---
+      //Enforce security defaults · KMS encryption · Least-privilege IAM//
+    end note
+  }
+
+  rectangle "**Utility Modules** — Logic-Only Helpers (No Resources)" as UM $C_MODULE {
+    note as umN
+      **iam-trust-oidc** · **iam-trust-service** · **iam-trust-principal**
+      **vpc-planner** · **secrets-read** · **helm-values** · **env-interface**
+      ---
+      //Computation · Policy generation · Value composition//
+    end note
+  }
+}
+
+SM -[hidden]d- RM
+RM -[hidden]d- UM
+
+' ═══════════════════════════════════════════════════════
+' ROW 2: ENVIRONMENT SUBMODULES
+' ═══════════════════════════════════════════════════════
+
+rectangle "**Environment Submodules** — //Per-Organization · Git Submodules//" $C_CICD {
+  rectangle "**<org>.iac.<cloud>**\nOpenTofu Configs\n(Layered State)" as IAC_SUB $C_IAC
+  rectangle "**<org>.cd.<cloud>**\nK8s Manifests\n(Kustomize + Helm)" as CD_SUB $C_CD
+
+  IAC_SUB -r-> CD_SUB : provisions &\ntriggers
+}
+
+UM -d[#999]-> IAC_SUB : modules\nconsumed by
+
+' ═══════════════════════════════════════════════════════
+' ROW 3: IAC LAYERS (OpenTofu)
+' ═══════════════════════════════════════════════════════
+
+rectangle "**IaC Layers** — //OpenTofu · Sequential Dependencies//" $C_IAC {
+
+  rectangle "**L1: Management**" as L1 $C_CICD {
+    note as l1n
+      Cost Allocation Tags · Identity Center (SSO) · Organization Policies
+    end note
+  }
+
+  rectangle "**L2: Network**" as L2 $C_CICD {
+    note as l2n
+      **IPAM** (IPv4+IPv6 Dual-Stack) · **VPC** (IPAM-Sourced CIDRs)
+      **Subnets**: Public (IGW) · Private (NAT) · Isolated (No Internet)
+      **Gateways**: NAT (IPAM EIP) · IGW · Egress-Only IGW (IPv6)
+      **Sharing**: RAM (Cross-Account Subnets) · VPC Endpoints (S3)
+      **Logging**: VPC Flow Logs → S3 (Parquet, REJECT)
+    end note
+  }
+
+  rectangle "**L3: Workload**" as L3 $C_CICD {
+    note as l3n
+      **EKS** Control Plane (Private API · KMS · Access Entries)
+      **Aurora** Serverless v2 (PostgreSQL · MySQL · Isolated Subnets)
+      **ECR** Store (KMS · Scan-on-Push · Lifecycle · Immutable Tags)
+      **Backup** Foundation (Tag-Based · Hourly/Daily/Weekly/Monthly)
+      **GitHub Actions** OIDC → ECR (Keyless CI/CD)
+    end note
+  }
+
+  rectangle "**L4: Workload-EKS**" as L4 $C_CICD {
+    note as l4n
+      **CNI**: Cilium (eBPF · Gateway API · Network Policy)
+      **Compute**: Karpenter (Spot+On-Demand · Bottlerocket · Nitro · Multi-Arch)
+                  Managed Node Groups (System Bootstrap)
+      **Addons**: CoreDNS · Pod Identity Agent · EBS CSI Driver · Snapshot Controller
+      **GitOps**: ArgoCD (App-of-Apps) · Helm Values (Preset Composition)
+    end note
+  }
+
+  L1 -d-> L2
+  L2 -d-> L3
+  L3 -d-> L4
+}
+
+IAC_SUB -d[#999]-> L1
+
+' ═══════════════════════════════════════════════════════
+' ROW 4: KUBERNETES PLATFORM
+' ═══════════════════════════════════════════════════════
+
+rectangle "**Kubernetes Platform** — //ArgoCD-Managed via GitOps//" $C_K8S {
+
+  rectangle "**Networking**\nCilium (CNI+L4) · Gateway API (L7)\ncert-manager · external-dns\nAWS LB Controller" as KN $C_GREEN
+
+  rectangle "**Observability (LGTM)**\nGrafana · Mimir (Metrics)\nLoki (Logs) · Alloy (Collector)\nmetrics-server" as KO $C_ACCENT
+
+  rectangle "**Policy & Governance**\nKyverno (Admission Control)\nNetwork Policies (Cilium)" as KP $C_SEC
+
+  rectangle "**Secrets**\nExternal Secrets Operator\n→ AWS Secrets Manager" as KS $C_DATA
+
+  rectangle "**Autoscaling & Scheduling**\nVPA (Vertical Pod Autoscaler)\nDescheduler (Pod Rebalancing)" as KA $C_COMPUTE
+
+  rectangle "**Automation**\nArgoCD (CD Engine)\nImage Updater (ECR → Git)" as KAU $C_CD
+}
+
+L4 -d[#999]-> KN : deploys
+
+' ═══════════════════════════════════════════════════════
+' ROW 5: GITOPS DELIVERY MODEL
+' ═══════════════════════════════════════════════════════
+
+rectangle "**GitOps Delivery Model** — //Convention-Based, Declarative//" $C_CD {
+
+  rectangle "**ArgoCD Bootstrap**\nApplicationSets (Auto-Discovery)\nAppProjects (RBAC Boundaries)" as BOOT
+
+  rectangle "**Three-Layer Sync Model**\n① Namespaces (Quotas · Limits) → Wave -20\n② Platform (Infra Services) → Wave -15..0\n③ Applications (Workloads) → Wave 0+" as SYNC
+
+  rectangle "**Repository Convention**\napps/<project>/<app>/base/ + overlays/<env>/\nclusters/<cluster>/namespaces · platform · apps\nbootstrap/<cluster>/argocd (appsets · projects)" as CONV
+
+  BOOT -r-> SYNC
+}
+
+CD_SUB -d[#999]-> BOOT : manifests
+
+' ═══════════════════════════════════════════════════════
+' ROW 6: CI/CD PIPELINE
+' ═══════════════════════════════════════════════════════
+
+rectangle "**CI/CD Pipeline** — //End-to-End Delivery Flow//" $C_CICD {
+
+  note as cicdN
+    **Developer** → push code → **App Repo**
+    → trigger → **GitHub Actions** (CI)
+    → OIDC token → **AWS OIDC Provider** → temp credentials
+    → build & push → **ECR** (Container Registry)
+    → webhook/poll → **ArgoCD Image Updater** → update tag → **GitOps Repo**
+    → webhook/poll → **ArgoCD** (Sync) → apply manifests → **Kubernetes Cluster**
+  end note
+}
+
+' ═══════════════════════════════════════════════════════
+' ROW 7: DATA & SECURITY
+' ═══════════════════════════════════════════════════════
+
+rectangle "**Data & Security** — //Cross-Cutting Concerns//" $C_DATA {
+
+  rectangle "**Data Layer**\nAurora Serverless v2 (PostgreSQL · MySQL)\nECR Repositories (KMS · Immutable Tags · Lifecycle)\nS3 Buckets (data · logs · archive · tfbackend)" as DL $C_DATA
+
+  rectangle "**Protection & Compliance**\nKMS (Customer-Managed · Annual Rotation)\nAWS Backup (Tag-Based Multi-Tier Plans)\nPod Identity · OIDC Federation\nSecrets Manager (Managed Rotation)\nNetwork Policies · Kyverno Policies\nVPC Flow Logs (Parquet → S3)" as PR $C_SEC
+
+  rectangle "**State Management**\nS3 Backend (Object Lock · Versioning)\nCross-Account Role Assumption\nDynamoDB Lock Table" as ST $C_IAC
+}
+
+' ═══════════════════════════════════════════════════════
+' LEGEND
+' ═══════════════════════════════════════════════════════
+
+legend right
+  **Design Philosophies**
+  ---------------------------------------
+  • **Modularity** — Three-tier
+    (Stack → Resource → Utility)
+  • **Security First** — KMS,
+    least-privilege IAM, Pod Identity
+  • **Cost Optimization** — Serverless,
+    Spot instances, shared networking
+  • **GitOps** — ArgoCD, convention-based
+    auto-discovery
+  • **IaC** — OpenTofu, layered state,
+    OIDC CI/CD
+  • **Dual-Stack** — IPv4+IPv6 via IPAM
+  • **Multi-Account** — Mgmt / Network /
+    Workload via RAM
+  • **Observability** — LGTM + Alloy
+  • **Policy-as-Code** — Kyverno + Cilium
+  ---------------------------------------
+  **Technology Stack**
+  ---------------------------------------
+  IaC       : OpenTofu · Helm · Kustomize
+  Runtime   : EKS · Bottlerocket · Karpenter
+  CNI       : Cilium · Gateway API
+  GitOps    : ArgoCD · Image Updater
+  Monitoring: Grafana · Loki · Mimir · Alloy
+  Security  : KMS · Pod Identity · Kyverno
+  Data      : Aurora v2 · ECR · S3
+  DNS/TLS   : Route53 · cert-manager
+                external-dns
+  Secrets   : ESO · Secrets Manager
+  Scaling   : VPA · Descheduler
+  Backup    : AWS Backup (tag-based)
+  CI        : GitHub Actions (OIDC→ECR)
+endlegend
+
+@enduml
